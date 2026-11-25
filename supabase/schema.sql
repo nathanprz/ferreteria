@@ -23,6 +23,11 @@ grant execute on function public.is_admin() to anon, authenticated;
 
 alter table public.docs enable row level security;
 
+-- Permisos de tabla (Supabase ya no los da por defecto). Las políticas de abajo limitan qué filas se ven o cambian.
+grant usage on schema public to anon, authenticated;
+grant select on public.docs to anon, authenticated;
+grant insert, update, delete on public.docs to authenticated;
+
 drop policy if exists docs_read on public.docs;
 drop policy if exists docs_insert on public.docs;
 drop policy if exists docs_update on public.docs;
