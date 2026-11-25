@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ferretería · Administración</title>
+<meta name="theme-color" content="#26343b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<header class="top"><div class="wrap" id="hdr"></div></header>
+<main><div class="wrap" id="app"><div class="empty">Cargando…</div></div></main>
+<div id="drawer" class="hidden"></div>
+<div id="modal" class="modal hidden"><div class="sheet"><div class="mh"><h3 id="mt"></h3><button class="x" data-act="mclose" aria-label="Cerrar">✕</button></div><div id="mb"></div></div></div>
+<div id="toast" class="toast hidden" role="status"></div>
+<script>window.APP_MODE="admin";</script>
+<script src="../config.js"></script>
+<script src="../assets/vendor/supabase.js"></script>
+<script src="../assets/vendor/jspdf.umd.min.js"></script>
+<script src="../assets/vendor/jspdf.plugin.autotable.min.js"></script>
+<script src="../assets/store.js"></script>
+<script src="../assets/app.js"></script>
+<script src="../assets/pdf.js"></script>
+</body>
+</html>
