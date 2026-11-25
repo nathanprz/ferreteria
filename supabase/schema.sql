@@ -45,3 +45,22 @@ create policy docs_delete on public.docs for delete to authenticated using (publ
 do $$ begin
   alter publication supabase_realtime add table public.docs;
 exception when duplicate_object then null; end $$;
+
+-- Fotos de productos: carpeta pública para ver, solo el administrador sube o borra.
+insert into storage.buckets (id, name, public) values ('product-photos', 'product-photos', true)
+on conflict (id) do update set public = true;
+
+drop policy if exists fotos_lectura on storage.objects;
+drop policy if exists fotos_insert on storage.objects;
+drop policy if exists fotos_update on storage.objects;
+drop policy if exists fotos_delete on storage.objects;
+
+create policy fotos_lectura on storage.objects for select to anon, authenticated
+  using (bucket_id = 'product-photos');
+create policy fotos_insert on storage.objects for insert to authenticated
+  with check (bucket_id = 'product-photos' and public.is_admin());
+create policy fotos_update on storage.objects for update to authenticated
+  using (bucket_id = 'product-photos' and public.is_admin())
+  with check (bucket_id = 'product-photos' and public.is_admin());
+create policy fotos_delete on storage.objects for delete to authenticated
+  using (bucket_id = 'product-photos' and public.is_admin());

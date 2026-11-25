@@ -163,7 +163,7 @@ function prodCard(p){
   const stock = num(p.stock), q = S.cart.items[p.id]||0;
   const out = stock<=0;
   const stk = out ? '<span class="pill bad">Agotado</span>' : (stock<=5 ? `<span class="pill warn">Quedan ${qtyf(stock)}</span>` : '<span class="pill good">Disponible</span>');
-  return `<div class="p"><div class="icow"><div class="ico" aria-hidden="true">${icon(p.category)}</div>${onOffer(p)?'<span class="tag">OFERTA</span>':''}</div>
+  return `<div class="p"><div class="icow"><div class="ico ${p.photo?'ph':''}" ${p.photo?'':'aria-hidden="true"'}>${p.photo?`<img src="${esc(p.photo)}" alt="${esc(p.name)}" loading="lazy">`:icon(p.category)}</div>${onOffer(p)?'<span class="tag">OFERTA</span>':''}</div>
     <div class="nm">${esc(p.name)}</div><div class="cat">${esc(p.category||'')}${p.unit?' · por '+esc(p.unit):''}</div>
     ${p.desc?`<div class="small muted">${esc(p.desc)}</div>`:''}
     <div class="pr num">${money(unitPrice(p))}${onOffer(p)?`<s>${money(p.price)}</s>`:''}</div>
@@ -325,6 +325,30 @@ function ask(msg, yes){
   $('#yes').onclick=()=>{ closeModal(); yes(); };
 }
 
+/* ---------- Fotos ---------- */
+const PHOTO_BUCKET = 'product-photos';
+function resizeImage(file, max=900){
+  return new Promise((res,rej)=>{
+    const url=URL.createObjectURL(file), img=new Image();
+    img.onload=()=>{ const k=Math.min(1,max/Math.max(img.width,img.height)); const c=document.createElement('canvas'); c.width=Math.round(img.width*k); c.height=Math.round(img.height*k);
+      const x=c.getContext('2d'); x.fillStyle='#fff'; x.fillRect(0,0,c.width,c.height); x.drawImage(img,0,0,c.width,c.height); URL.revokeObjectURL(url);
+      c.toBlob(b=>b?res(b):rej(new Error('No se pudo procesar la foto')),'image/jpeg',0.82); };
+    img.onerror=()=>{ URL.revokeObjectURL(url); rej(new Error('No se pudo leer la imagen')); };
+    img.src=url;
+  });
+}
+async function uploadPhoto(pid, file){
+  const blob=await resizeImage(file);
+  const path=pid+'.jpg';
+  const { error } = await S.sb.storage.from(PHOTO_BUCKET).upload(path, blob, { upsert:true, contentType:'image/jpeg', cacheControl:'3600' });
+  if(error) throw error;
+  return S.sb.storage.from(PHOTO_BUCKET).getPublicUrl(path).data.publicUrl + '?v=' + Date.now();
+}
+function showPhotoPreview(input){
+  const f=input.files&&input.files[0]; const box=$('#f_prev'); if(!box) return;
+  if(f){ box.innerHTML=''; const im=document.createElement('img'); im.src=URL.createObjectURL(f); im.alt='Vista previa'; box.appendChild(im); }
+}
+
 /* ---------- Inventario ---------- */
 function tabInventario(){
   const q=norm(fv('iq')), cat=fv('icat','Todas');
@@ -341,7 +365,7 @@ function tabInventario(){
   ${!all.length?`<div class="card empty">Todavía no tienes productos.<br><br><button class="btn" data-act="pedit" data-id="">Agregar el primero</button> <button class="btn sec" data-act="seed">Cargar productos de ejemplo</button></div>`:
   `<div class="tw"><table><thead><tr><th>Producto</th><th>Proveedor</th><th class="r">Stock</th><th class="r">Costo</th><th class="r">Precio</th><th class="r">Margen</th><th></th></tr></thead><tbody>
   ${list.map(p=>{const c=cost(p.id),s=num(p.stock),m=minOf(p.id),lowp=s<=m;return `<tr>
-    <td><b>${esc(p.name)}</b><div class="small muted">${esc(p.category||'')}${p.active===false?' · oculto en catálogo':''}${onOffer(p)?' · <span class="pill good">oferta '+money(p.offer)+'</span>':''}</div></td>
+    <td><div class="row" style="flex-wrap:nowrap;gap:10px"><div class="thumb sm">${p.photo?`<img src="${esc(p.photo)}" alt="" loading="lazy">`:''}</div><div><b>${esc(p.name)}</b><div class="small muted">${esc(p.category||'')}${p.active===false?' · oculto en catálogo':''}${onOffer(p)?' · <span class="pill good">oferta '+money(p.offer)+'</span>':''}</div></div></div></td>
     <td>${esc(supOf(p.id))||'<span class="muted">—</span>'}</td>
     <td class="r num ${s<=0?'bad-t':''}">${qtyf(s)} ${esc(p.unit||'')}${lowp?` <span class="pill ${s<=0?'bad':'warn'}">${s<=0?'agotado':'bajo'}</span>`:''}</td>
     <td class="r num">${money(c)}</td><td class="r num">${money(p.price)}</td>
@@ -357,6 +381,10 @@ function productModal(id){
   <datalist id="dl_cat">${allCats().map(x=>`<option value="${esc(x)}">`).join('')}</datalist>
   <datalist id="dl_sup">${sups.map(x=>`<option value="${esc(x.name)}">`).join('')}</datalist>
   <div class="form">
+    <div class="full row" style="gap:12px;align-items:center">
+      <div id="f_prev" class="thumb">${p&&p.photo?`<img src="${esc(p.photo)}" alt="Foto actual">`:'<span class="muted small">Sin foto</span>'}</div>
+      <div class="stack" style="gap:6px;flex:1;min-width:180px"><label class="f">Foto del producto<input type="file" id="f_photo" accept="image/*" data-photo="1"></label>
+      ${p&&p.photo?'<label class="f" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="f_nophoto" style="width:auto"> Quitar foto</label>':''}</div></div>
     <label class="f full">Nombre<input type="text" id="f_name" value="${esc(p?.name||'')}"></label>
     <label class="f">Categoría<input type="text" id="f_cat" list="dl_cat" value="${esc(p?.category||'')}"></label>
     <label class="f">Proveedor<input type="text" id="f_sup" list="dl_sup" value="${esc(c.supplier||'')}"></label>
@@ -377,7 +405,12 @@ async function saveProduct(id){
   const pid=id||S.db.collection('products').doc().id;
   const pub={name,category:g('f_cat')||'General',unit:g('f_unit')||'pza',price:num(g('f_price')),offer:num(g('f_offer')),stock:num(g('f_stock')),desc:g('f_desc'),active:$('#f_active').checked};
   const priv={cost:num(g('f_cost')),supplier:g('f_sup'),min:num(g('f_min'))};
+  const old = id ? S.products[id] : null;
+  pub.photo = old && old.photo ? old.photo : '';
+  if ($('#f_nophoto') && $('#f_nophoto').checked) pub.photo = '';
   await safe(async()=>{
+    const file = $('#f_photo') && $('#f_photo').files[0];
+    if (file) { toast('Subiendo foto…'); pub.photo = await uploadPhoto(pid, file); }
     await S.db.doc('products/'+pid).set(pub);
     await S.db.doc(PRIV+'/costs/'+pid).set(priv);
     S.products[pid]={id:pid,...pub}; S.costs[pid]={id:pid,...priv};
@@ -721,6 +754,7 @@ document.addEventListener('input',e=>{
 });
 document.addEventListener('change',e=>{
   const t=e.target;
+  if(t.dataset.photo) showPhotoPreview(t);
   if(t.dataset.chg==='saleday'){ if(t.value){ S.saleDay=t.value; render(); } }
   if(t.dataset.sl) render();
   if(t.dataset.ord==='qty') render();

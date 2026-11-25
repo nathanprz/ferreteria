@@ -5,6 +5,7 @@ const pdfTxt = s => String(s ?? '').replace(/[–—]/g,'-').replace(/[‘’]/g
 const pdfMoney = n => '$' + (Math.round((+n||0)*100)/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 
 function buildCatalogPdf(data, lib){
+  const IMG = data.images || {};
   /* data: {store:{name,tagline,whatsapp,address}, products:[...], packages:[...]}  */
   const { jsPDF } = lib || window.jspdf;
   const doc = new jsPDF({ unit:'pt', format:'letter' });
@@ -61,6 +62,13 @@ function buildCatalogPdf(data, lib){
     alternateRowStyles: { fillColor: [250,250,247] },
     theme: 'grid'
   };
+  const photoCell = p => ({ content: '', styles: { minCellHeight: 50 } });
+  const drawPhoto = list => d => {
+    if (d.section !== 'body' || d.column.index !== 0) return;
+    const p = list[d.row.index], im = p && IMG[p.id]; if (!im) return;
+    const box = 42, k = Math.min(box/im.w, box/im.h), w = im.w*k, h = im.h*k;
+    try { doc.addImage(im.data, 'JPEG', d.cell.x + (56-w)/2, d.cell.y + (d.cell.height-h)/2, w, h); } catch (_) {}
+  };
   let firstSection = true;
   function sectionTitle(text, color){
     let ty;
@@ -79,10 +87,11 @@ function buildCatalogPdf(data, lib){
   if (offers.length) {
     const sy = needTitle('Ofertas', ORANGE);
     doc.autoTable({ ...commonTable, startY: sy, margin: { ...commonTable.margin, top: 56 },
-      head: [['Producto','Unidad','Precio normal','Oferta']],
-      body: offers.map(p => [pdfTxt(p.name), pdfTxt(p.unit||'pza'), pdfMoney(p.price), pdfMoney(p.offer)]),
+      head: [['','Producto','Unidad','Precio normal','Oferta']],
+      body: offers.map(p => [photoCell(p), pdfTxt(p.name), pdfTxt(p.unit||'pza'), pdfMoney(p.price), pdfMoney(p.offer)]),
+      didDrawCell: drawPhoto(offers),
       headStyles: { fillColor: ORANGE, textColor: 255 },
-      columnStyles: { 1:{halign:'center'}, 2:{halign:'right', textColor: MUTED}, 3:{halign:'right', fontStyle:'bold', textColor: ORANGE} } });
+      columnStyles: { 0:{cellWidth:56}, 2:{halign:'center'}, 3:{halign:'right', textColor: MUTED}, 4:{halign:'right', fontStyle:'bold', textColor: ORANGE} } });
   }
   if (pkgs.length) {
     const sy = needTitle('Paquetes completos', STEEL);
@@ -95,10 +104,11 @@ function buildCatalogPdf(data, lib){
   catNames.forEach(c => {
     const sy = needTitle(c, STEEL);
     doc.autoTable({ ...commonTable, startY: sy,
-      head: [['Producto','Unidad','Precio']],
-      body: byCat[c].map(p => [pdfTxt(p.name) + (p.desc ? '\n' + pdfTxt(p.desc) : ''), pdfTxt(p.unit||'pza'), onOffer(p) ? pdfMoney(p.offer) + '  (oferta)' : pdfMoney(p.price)]),
+      head: [['','Producto','Unidad','Precio']],
+      body: byCat[c].map(p => [photoCell(p), pdfTxt(p.name) + (p.desc ? '\n' + pdfTxt(p.desc) : ''), pdfTxt(p.unit||'pza'), onOffer(p) ? pdfMoney(p.offer) + '  (oferta)' : pdfMoney(p.price)]),
+      didDrawCell: drawPhoto(byCat[c]),
       headStyles: { fillColor: STEEL, textColor: 255 },
-      columnStyles: { 1:{halign:'center', cellWidth:70}, 2:{halign:'right', fontStyle:'bold', cellWidth:110} } });
+      columnStyles: { 0:{cellWidth:56}, 2:{halign:'center', cellWidth:70}, 3:{halign:'right', fontStyle:'bold', cellWidth:110} } });
   });
 
   /* encabezado y pie en todas las páginas menos la portada */
@@ -115,7 +125,8 @@ function buildCatalogPdf(data, lib){
 }
 
 async function downloadCatalogPdf(share){
-  const doc = buildCatalogPdf({ store: S.config, products: prods(), packages: Object.values(S.packages) });
+  const images = await loadPdfImages(prods());
+  const doc = buildCatalogPdf({ store: S.config, products: prods(), packages: Object.values(S.packages), images });
   const fname = 'catalogo-' + (pdfTxt(S.config.name || 'ferreteria').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'') || 'ferreteria') + '.pdf';
   if (share) {
     try {
@@ -124,4 +135,15 @@ async function downloadCatalogPdf(share){
     } catch (e) { if (e && e.name === 'AbortError') return; }
   }
   doc.save(fname);
+}
+
+function loadPdfImages(list){
+  const out = {};
+  const one = p => new Promise(res => {
+    if (!p.photo) return res();
+    fetch(p.photo).then(r => r.ok ? r.blob() : Promise.reject()).then(b => new Promise((ok, no) => {
+      const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.onerror = no; fr.readAsDataURL(b);
+    })).then(data => { const im = new Image(); im.onload = () => { out[p.id] = { data, w: im.width, h: im.height }; res(); }; im.onerror = () => res(); im.src = data; }).catch(() => res());
+  });
+  return Promise.all(list.filter(p => p.active !== false && (+p.stock||0) > 0).map(one)).then(() => out);
 }

@@ -1,5 +1,5 @@
 /* Service worker: la app abre aunque no haya señal (sin datos nuevos). Los datos viven en Supabase. */
-const CACHE = 'ferreteria-v1';
+const CACHE = 'ferreteria-v2';
 const SHELL = ['./','./admin/','./config.js','./assets/style.css','./assets/app.js','./assets/store.js','./assets/pdf.js',
   './assets/vendor/supabase.js','./assets/vendor/jspdf.umd.min.js','./assets/vendor/jspdf.plugin.autotable.min.js',
   './icons/icon-192.png','./icons/icon-512.png','./icons/icon.svg'];
